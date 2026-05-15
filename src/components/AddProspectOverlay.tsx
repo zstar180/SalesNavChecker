@@ -1,21 +1,38 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { addBusinessDaysLocal, formatWeekdayName } from '../date';
 import type { AddDayOption } from '../types';
 import { ADD_DAY_OPTIONS } from '../types';
 
 type Props = {
   open: boolean;
+  businessToday: string;
   onClose: () => void;
   onSave: (input: { name: string; linkedin_url: string; days: AddDayOption }) => void;
 };
 
 const LINKEDIN_PATTERN = /linkedin\.com\//i;
 
-export function AddProspectOverlay({ open, onClose, onSave }: Props) {
+function followUpOptionLabel(days: AddDayOption, businessToday: string): string {
+  const weekday = formatWeekdayName(addBusinessDaysLocal(businessToday, days));
+  const dayWord = days === 1 ? 'day' : 'days';
+  return `${days} ${dayWord} - ${weekday}`;
+}
+
+export function AddProspectOverlay({ open, businessToday, onClose, onSave }: Props) {
   const [name, setName] = useState('');
   const [linkedinUrl, setLinkedinUrl] = useState('');
   const [days, setDays] = useState<AddDayOption>(0);
   const [errors, setErrors] = useState<{ name?: string; url?: string }>({});
   const nameRef = useRef<HTMLInputElement>(null);
+
+  const followUpOptions = useMemo(
+    () =>
+      ADD_DAY_OPTIONS.map((d) => ({
+        value: d,
+        label: followUpOptionLabel(d, businessToday),
+      })),
+    [businessToday],
+  );
 
   useEffect(() => {
     if (open) {
@@ -23,7 +40,6 @@ export function AddProspectOverlay({ open, onClose, onSave }: Props) {
       setLinkedinUrl('');
       setDays(0);
       setErrors({});
-      // Focus the first field once the overlay opens.
       setTimeout(() => nameRef.current?.focus(), 0);
     }
   }, [open]);
@@ -104,18 +120,20 @@ export function AddProspectOverlay({ open, onClose, onSave }: Props) {
             {errors.url && <span className="field-error">{errors.url}</span>}
           </label>
           <label className="field">
-            <span className="field-label">Days until next outreach</span>
+            <span className="field-label">Days until Follow up</span>
             <select
               value={days}
               onChange={(e) => setDays(Number(e.target.value) as AddDayOption)}
             >
-              {ADD_DAY_OPTIONS.map((d) => (
-                <option key={d} value={d}>
-                  {d} {d === 1 ? 'day' : 'days'}
+              {followUpOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
                 </option>
               ))}
             </select>
-            <span className="field-help">0 = show today</span>
+            <span className="field-help">
+              Business days only — weekends are skipped (e.g. Thu + 2 → Mon).
+            </span>
           </label>
           <div className="overlay-actions">
             <button type="button" className="btn btn-ghost" onClick={onClose}>

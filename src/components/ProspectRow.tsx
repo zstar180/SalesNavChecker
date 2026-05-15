@@ -1,19 +1,45 @@
-import { useState } from 'react';
-import type { Prospect, WaitDays } from '../types';
-import { WAIT_OPTIONS } from '../types';
+import { useMemo } from 'react';
+import { addBusinessDaysLocal, formatWeekdayShort } from '../date';
+import type { Prospect } from '../types';
+
+const MOVE_BUSINESS_DAY_RANGE = 60;
 
 type Props = {
   prospect: Prospect;
+  businessToday: string;
+  bumpScheduleLabel?: string;
+  onBumpDayClick?: () => void;
   onToggleStar: (id: string) => void;
-  onLogTouch: (id: string, days: WaitDays) => void;
+  onOpenDone: (prospect: Prospect) => void;
   onBookMeeting: (id: string) => void;
+  onRescheduleToDay: (id: string, targetDate: string) => void;
 };
 
-export function ProspectRow({ prospect, onToggleStar, onLogTouch, onBookMeeting }: Props) {
-  const [waitDays, setWaitDays] = useState<WaitDays>(2);
+export function ProspectRow({
+  prospect,
+  businessToday,
+  bumpScheduleLabel,
+  onBumpDayClick,
+  onToggleStar,
+  onOpenDone,
+  onBookMeeting,
+  onRescheduleToDay,
+}: Props) {
+  const moveOptions = useMemo(() => {
+    const opts: { value: string; label: string }[] = [];
+    for (let n = 0; n <= MOVE_BUSINESS_DAY_RANGE; n += 1) {
+      const value = addBusinessDaysLocal(businessToday, n);
+      if (value === prospect.next_show_date) continue;
+      opts.push({
+        value,
+        label: `${n}d · ${formatWeekdayShort(value)}`,
+      });
+    }
+    return opts;
+  }, [businessToday, prospect.next_show_date]);
 
   return (
-    <li className="row">
+    <li className={`row ${prospect.outreach_overdue ? 'row-overdue' : ''}`}>
       <div className="row-left">
         <button
           type="button"
@@ -34,37 +60,60 @@ export function ProspectRow({ prospect, onToggleStar, onLogTouch, onBookMeeting 
           >
             LinkedIn
           </a>
+          {bumpScheduleLabel ? (
+            onBumpDayClick ? (
+              <button
+                type="button"
+                className="row-bump row-bump-btn"
+                onClick={onBumpDayClick}
+              >
+                Bump: {bumpScheduleLabel}
+              </button>
+            ) : (
+              <span className="row-bump">Bump: {bumpScheduleLabel}</span>
+            )
+          ) : null}
         </div>
       </div>
       <div className="row-right">
-        <label className="visually-hidden" htmlFor={`wait-${prospect.id}`}>
-          Days to wait
-        </label>
-        <select
-          id={`wait-${prospect.id}`}
-          className="wait-select"
-          value={waitDays}
-          onChange={(e) => setWaitDays(Number(e.target.value) as WaitDays)}
-        >
-          {WAIT_OPTIONS.map((d) => (
-            <option key={d} value={d}>
-              {d} {d === 1 ? 'day' : 'days'}
-            </option>
-          ))}
-        </select>
         <button
           type="button"
-          className="btn btn-primary"
-          onClick={() => onLogTouch(prospect.id, waitDays)}
+          className="btn btn-primary btn-row-action"
+          aria-label="Done — set next Tasks date or stop Tasks"
+          onClick={() => onOpenDone(prospect)}
         >
-          Log touch &amp; wait
+          Done
         </button>
+        <div className="row-move-wrap">
+          <label className="visually-hidden" htmlFor={`move-${prospect.id}`}>
+            Move Tasks offset (business workdays from anchor)
+          </label>
+          <select
+            key={`${prospect.id}-${prospect.next_show_date}`}
+            id={`move-${prospect.id}`}
+            className="wait-select move-day-select row-move-select"
+            defaultValue=""
+            onChange={(e) => {
+              const v = e.target.value;
+              if (!v) return;
+              onRescheduleToDay(prospect.id, v);
+            }}
+          >
+            <option value="">Move</option>
+            {moveOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
         <button
           type="button"
-          className="btn btn-accent"
+          className="btn btn-end btn-row-action"
+          aria-label="End — mark meeting booked; removes from Tasks list"
           onClick={() => onBookMeeting(prospect.id)}
         >
-          Meeting booked!
+          End
         </button>
       </div>
     </li>

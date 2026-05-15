@@ -1,8 +1,8 @@
-# Prospecting Daily List (MVP)
+# Prospecting Tasks List (MVP)
 
-A minimal personal outreach task app: a daily list of prospects to interact with. Each row is a prospect with a name and a plain LinkedIn link (opens in a new tab). For each prospect you can either log a touch and wait N days, or mark a meeting booked (which permanently removes them from the daily list in this MVP).
+A minimal personal task list for prospecting: each row is a prospect with a name and a plain LinkedIn link (opens in a new tab). You can complete a touch and schedule the next Tasks date, mark **End** when a meeting is booked (which removes them from the daily Tasks list in this MVP), or **Stop Tasks** to stop following up.
 
-No LinkedIn / Sales Navigator APIs. No backend. No accounts. Data lives entirely in your browser.
+No LinkedIn / Sales Navigator APIs. No backend. No sign-in. Data lives in your browser’s `localStorage` for this site origin—**per browser profile** (for example, each Chrome profile has its own storage).
 
 ## Stack
 
@@ -18,6 +18,8 @@ npm run dev
 
 Then open the URL Vite prints (usually `http://localhost:5173`).
 
+Prospects and your selected list date are **saved automatically** in `localStorage` whenever they change, so closing the tab or refreshing does not lose work on this browser profile.
+
 Other scripts:
 
 ```bash
@@ -27,20 +29,28 @@ npm run preview   # serve the production build locally
 
 ## Where data lives
 
-All prospect data is stored in your browser's `localStorage` under the key:
+Prospects are stored under:
 
 ```
 prospecting-daily-prospects-v1
 ```
 
-Clearing your browser site data for the dev origin will reset the app. There are no servers and no external API calls.
+The list always **opens on today** (or the next weekday if today is a weekend). The date you browse with the arrows is not saved across refresh.
+
+Websites cannot read Chrome’s “signed in to Chrome” identity. If you previously used a build that stored data under Google-scoped keys (`prospecting-daily-prospects-v1:user:…`), the app **moves the first non-empty bucket** into the main prospects key the first time it loads with an empty main list.
+
+Clearing site data for this origin removes your list. Different devices or browser profiles do not share data unless you add sync later.
 
 ## Behavior
 
-- Daily list shows prospects where `status === "active"` and `next_show_date <= today` (local calendar).
-- Sorted: starred first, then oldest `created_at` first, then name, then id.
-- Add prospect overlay creates a row with `created_at = today`, `next_show_date = today + days_until_next_outreach`, `starred = false`, `status = "active"`.
-- "Log touch & wait" with N in {1, 2, 3, 5, 7, 9, 10} sets `next_show_date = today + N`.
-- "Meeting booked!" sets `status = "meeting_booked"` so the row never appears on the daily list again (the record stays in storage for a future archived view).
+- Each active prospect has a **`next_show_date`**: the **only** calendar date they appear on the list (exact match for the date you are viewing).
+- Use the controls at the top to move between **weekdays only** (Sat/Sun are skipped). On load and refresh the list shows **today** (next weekday on weekends).
+- **Weekends:** Add-form offsets, **Done** defaults, and **Move** all use **business workdays** (Mon–Fri). Saturday/Sunday are skipped (e.g. Thu + 2 workdays → Mon). Scheduled dates on a weekend snap to the next Monday.
+- If a task was still scheduled on a **past** calendar date when you open the app, it **rolls forward** to **today or the next workday** and is marked **overdue** (red) until you **Done** or **Move**.
+- **Add prospect**: saves **`outreach_interval_days`** from the form; first **`next_show_date`** is **today + that many business workdays** (0 = next workday on or after today). Dropdown options show counts as **`N Tasks`**.
+- **Done** opens a dialog: pick **next Tasks date** (default = **today + cadence workdays**) or **Stop Tasks** (`outreach_stopped` — hidden from the list like a meeting).
+- **Move** lists **0–60 business workdays from today** as `Nd · weekday`, and moves the row to that date (removes it from the current view).
+- **End** sets `status = "meeting_booked"` so the row no longer appears on the list (record stays in storage).
+- Sorted: starred first, then oldest `created_at`, then name, then id.
 - Star toggles immediately and persists.
 - LinkedIn URL must contain `linkedin.com/`. Name is required.
